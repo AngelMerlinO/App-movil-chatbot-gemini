@@ -11,6 +11,8 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _userMessage = TextEditingController();
+  final ScrollController _scrollController =
+      ScrollController();
 
   static const apiKey = "API_KEY_GEMINI";
 
@@ -24,30 +26,43 @@ class _ChatScreenState extends State<ChatScreen> {
 
     setState(() {
       // Add user message to the chat
-      _messages.add(Message(isUser: true, message: message, date: DateTime.now()));
+      _messages
+          .add(Message(isUser: true, message: message, date: DateTime.now()));
     });
 
-    // Send the user message to the bot and wait for the response
+    _scrollToBottom();
     final content = [Content.text(message)];
     final response = await model.generateContent(content);
+
     setState(() {
-      // Add bot's response to the chat
       _messages.add(Message(
           isUser: false, message: response.text ?? "", date: DateTime.now()));
     });
+    _scrollToBottom();
+  }
+
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
         appBar: AppBar(
-          title: const Text('Gemini Chat Bot'),
+          title: const Text('Villo Chat Bot'),
         ),
         body: Column(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             Expanded(
               child: ListView.builder(
+                controller: _scrollController, // Attach the ScrollController
                 itemCount: _messages.length,
                 itemBuilder: (context, index) {
                   final message = _messages[index];
@@ -60,7 +75,8 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 15),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 15.0, vertical: 15),
               child: Row(
                 children: [
                   Expanded(
@@ -70,18 +86,18 @@ class _ChatScreenState extends State<ChatScreen> {
                       decoration: InputDecoration(
                         border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(50)),
-                        label: const Text("Enter your message"),
+                        label: const Text("Que deseas saber?"),
                       ),
                     ),
                   ),
                   const Spacer(),
                   IconButton(
                     padding: const EdgeInsets.all(15),
-                    iconSize: 30,
+                    iconSize: 20,
                     style: ButtonStyle(
-                      backgroundColor: MaterialStateProperty.all(Colors.black),
-                      foregroundColor: MaterialStateProperty.all(Colors.white),
-                      shape: MaterialStateProperty.all(
+                      backgroundColor: WidgetStateProperty.all(Colors.black),
+                      foregroundColor: WidgetStateProperty.all(Colors.white),
+                      shape: WidgetStateProperty.all(
                         const CircleBorder(),
                       ),
                     ),
@@ -119,13 +135,13 @@ class Messages extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: isUser
-            ? const Color.fromARGB(255, 9, 48, 79)
-            : Colors.grey.shade300,
+            ? Color.fromARGB(255, 35, 110, 171)
+            : Color.fromARGB(183, 50, 173, 244),
         borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(10),
-          bottomLeft: isUser ? const Radius.circular(10) : Radius.zero,
-          topRight: const Radius.circular(10),
-          bottomRight: isUser ? Radius.zero : const Radius.circular(10),
+          topLeft: const Radius.circular(8),
+          bottomLeft: isUser ? const Radius.circular(8) : Radius.zero,
+          topRight: const Radius.circular(8),
+          bottomRight: isUser ? Radius.zero : const Radius.circular(8),
         ),
       ),
       child: Column(
