@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Necesitamos acceder a tu micrófono para capturar tu voz.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>La aplicación utiliza reconocimiento de voz para comprender tus preguntas.</string>
+	<key>NSSpeechSynthesisUsageDescription</key>
+	<string>Necesitamos utilizar la síntesis de voz para responderte en voz alta.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

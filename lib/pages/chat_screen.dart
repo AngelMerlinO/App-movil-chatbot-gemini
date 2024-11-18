@@ -1,9 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:intl/intl.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:flutter_tts/flutter_tts.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -16,18 +19,46 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _userMessage = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isWifiConnected = false;
+  bool _isListening = false;
 
-  static const apiKey = "API_KEY_GEMINI";
+  static const apiKey = "AIzaSyDseW-7X4enN_5MXlX1amPhWG7ydHgFXQw";
   final model = GenerativeModel(model: 'gemini-pro', apiKey: apiKey);
 
   List<Message> _messages = [];
 
+  // Speech-to-text and Text-to-speech
+  final stt.SpeechToText _speechToText = stt.SpeechToText();
+  final FlutterTts _flutterTts = FlutterTts();
+
   @override
   void initState() {
     super.initState();
+    _initializeSpeechToText();
+    _configureTts();
     _checkWifiConnection();
     Connectivity().onConnectivityChanged.listen(_updateConnectionStatus);
     _loadMessages();
+  }
+
+  Future<void> _initializeSpeechToText() async {
+    bool available = await _speechToText.initialize();
+    if (!available) {
+      print('Speech recognition no está disponible.');
+    }
+  }
+
+  Future<void> _configureTts() async {
+    if (Platform.isIOS) {
+      await _flutterTts.setIosAudioCategory(
+        IosTextToSpeechAudioCategory.playAndRecord,
+        [
+          IosTextToSpeechAudioCategoryOptions.defaultToSpeaker,
+        ],
+      );
+    }
+    if (Platform.isAndroid) {
+      await _flutterTts.setSpeechRate(0.5); // Configuración adicional para Android
+    }
   }
 
   Future<void> _checkWifiConnection() async {
@@ -51,6 +82,7 @@ class _ChatScreenState extends State<ChatScreen> {
             .map((data) => Message.fromJson(data))
             .toList();
       });
+      _scrollToBottom(); // Asegura que el scroll esté abajo al cargar mensajes
     }
   }
 
@@ -60,40 +92,82 @@ class _ChatScreenState extends State<ChatScreen> {
     await prefs.setString('chat_messages', encodedMessages);
   }
 
-  Future<void> sendMessage() async {
-    final message = _userMessage.text;
-    _userMessage.clear();
-
+  Future<void> sendMessage(String message) async {
+    if (message.isEmpty) return; // Validación adicional
     setState(() {
       _messages.add(Message(isUser: true, message: message, date: DateTime.now()));
     });
 
     _saveMessages();
-    _scrollToBottom();
+    _scrollToBottom(); // Mueve el scroll hacia abajo
 
-    final content = [Content.text(message)];
-    final response = await model.generateContent(content);
+    try {
+      final content = [Content.text(message)];
+      final response = await model.generateContent(content);
 
-    setState(() {
-      _messages.add(Message(
-        isUser: false,
-        message: response.text ?? "",
-        date: DateTime.now(),
-      ));
-    });
+      final botMessage = response.text ?? "Lo siento, no pude entender eso.";
 
-    _saveMessages();
-    _scrollToBottom();
+      setState(() {
+        _messages.add(Message(
+          isUser: false,
+          message: botMessage,
+          date: DateTime.now(),
+        ));
+      });
+
+      _scrollToBottom(); // Asegura que el scroll esté abajo al recibir respuesta
+      await _speak(botMessage); // Lee en voz alta la respuesta del chatbot
+      _saveMessages();
+    } catch (e) {
+      print("Error enviando mensaje: $e");
+    }
+  }
+
+  Future<void> _speak(String text) async {
+    try {
+      await _flutterTts.speak(text);
+    } catch (e) {
+      print("Error al reproducir audio: $e");
+    }
+  }
+
+  void _startListening() async {
+    if (!_isListening) {
+      bool available = await _speechToText.initialize();
+      if (available) {
+        setState(() => _isListening = true);
+        _speechToText.listen(
+          onResult: (result) {
+            final recognizedWords = result.recognizedWords;
+            if (result.finalResult && recognizedWords.isNotEmpty) {
+              _speechToText.stop();
+              setState(() => _isListening = false);
+              _userMessage.text = recognizedWords;
+              sendMessage(recognizedWords); // Envía automáticamente el mensaje
+            }
+          },
+        );
+      }
+    }
+  }
+
+  void _stopListening() {
+    if (_isListening) {
+      _speechToText.stop();
+      setState(() => _isListening = false);
+    }
   }
 
   void _scrollToBottom() {
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   @override
@@ -123,6 +197,10 @@ class _ChatScreenState extends State<ChatScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 15.0, vertical: 15),
             child: Row(
               children: [
+                IconButton(
+                  icon: Icon(_isListening ? Icons.mic : Icons.mic_none),
+                  onPressed: _isListening ? _stopListening : _startListening,
+                ),
                 Expanded(
                   flex: 15,
                   child: TextFormField(
@@ -147,8 +225,11 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   onPressed: _isWifiConnected
                       ? () {
-                    sendMessage();
-                  }
+                          final message = _userMessage.text;
+                          if (message.isNotEmpty) {
+                            sendMessage(message);
+                          }
+                        }
                       : null,
                   icon: const Icon(Icons.send),
                 ),
