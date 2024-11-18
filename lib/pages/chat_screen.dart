@@ -21,7 +21,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isWifiConnected = false;
   bool _isListening = false;
 
-  static const apiKey = "AIzaSyDseW-7X4enN_5MXlX1amPhWG7ydHgFXQw";
+  static const apiKey = "api-key";
   final model = GenerativeModel(model: 'gemini-pro', apiKey: apiKey);
 
   List<Message> _messages = [];
